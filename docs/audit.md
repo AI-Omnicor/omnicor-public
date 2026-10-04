@@ -329,6 +329,37 @@ FeeSplitter suite, quarterly vesting rewrite, expiry-burn edges).
   ext4 `/var/lib/omnicor-el/cgt`. 420901 migration to the same pattern
   is planned.
 
+## Sixth pass — TAKSI seam audit (2026-10-04)
+
+Full read of the platform integration layer (`omnilink` ~2.6k LOC on
+the taksi-platform side): debt-book writes, rate-source hierarchy,
+`format=ledger`/`run` exports, `VerifySettlement` on-chain check,
+claim idempotency — ABI verified selector-by-selector against the
+deployed contracts.
+
+Findings (both fixed):
+
+1. **Double-burn via overlapping exports** (platform d5a96bf). An open
+   `?format=ledger` export included records already claimed by an
+   active settlement run — the same records `?run=<id>` exports.
+   Burning both payloads burns twice; burning only the open export
+   leaves `VerifySettlement` with an AMOUNT MISMATCH against the run.
+   Fix: open exports now exclude records held by active runs and carry
+   `in_settlement_runs` (pending run ids) plus a `note` marking the
+   view as audit-only — real burns go through `?run=`.
+2. **L1 verify env not emitted** (omnicor 6eb5ea3dd9). The platform
+   reads `OMNI_L1_RPC_URL`/`OMNI_L1_TOKEN` for
+   `/admin/omni/run/settle`, but neither `taksi.env.example` nor
+   `update_taksi_env.py` produced them — an operator would have had to
+   discover the variables by hand. Both templates now emit the
+   canonical values.
+
+Verified clean: `price0()`/`token0()`/`getAmountOut(uint256,address)`
+pool ABI, `burnDirect()`/`totalBurned()`/`sweep()`/`totalToTreasury()`
+call sites, UNIQUE(payment_id) claim idempotency, interrupted-run
+policy (never auto-released), `rate_src` audit labels including
+`reprice_*` fallbacks.
+
 ## Out of scope
 
 OP Stack predeploys and L1 system contracts (upstream audit coverage),
