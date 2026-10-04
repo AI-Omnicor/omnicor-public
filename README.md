@@ -15,7 +15,7 @@
 > **Infrastructure project.** OMNICOR is an independent Layer-2 blockchain built on the OP
 > Stack, with OMNI as the chain's native gas token (custom gas token, CGT v2). Application-layer
 > bridging, deflationary tokenomics enforced by immutable contracts, and a revenue-linked
-> burn tied to real platform usage — the TAKSI mobility platform.
+> burn tied to real platform usage — the [TAKSI mobility platform](https://github.com/AI-Omnicor/taksi-platform-public).
 
 ## What makes it different
 
@@ -84,6 +84,9 @@ cd contracts && forge test     # 73 tests — vesting, bridge, AMM, splitter, tr
 
 Built on the [OP Stack](https://github.com/ethereum-optimism/optimism) — custom gas token
 path (CGT v2), kona-based fault proofs, op-reth execution.
+
+**Ecosystem:** [TAKSI mobility platform](https://github.com/AI-Omnicor/taksi-platform-public) —
+the real-world usage layer that feeds the buyback-burn engine.
 
 ## License
 
