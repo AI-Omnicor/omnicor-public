@@ -1,0 +1,54 @@
+# OMNICOR devnet/prod Prometheus scrape config.
+# All ports come from .deployer/anvil/scripts/topology.psd1 (single source).
+# Start: prometheus --config.file=omnicor/monitoring/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  # op-node sequencer candidates (chain 420901)
+  - job_name: op-node-a
+    static_configs: [{ targets: ["127.0.0.1:7300"], labels: { node: a } }]
+  - job_name: op-node-b
+    static_configs: [{ targets: ["127.0.0.1:7301"], labels: { node: b } }]
+  - job_name: op-node-t
+    static_configs: [{ targets: ["127.0.0.1:7302"], labels: { node: t } }]
+
+  # op-conductor raft voters
+  - job_name: op-conductor-1
+    static_configs: [{ targets: ["127.0.0.1:7310"], labels: { conductor: cond1 } }]
+  - job_name: op-conductor-2
+    static_configs: [{ targets: ["127.0.0.1:7311"], labels: { conductor: cond2 } }]
+  - job_name: op-conductor-3
+    static_configs: [{ targets: ["127.0.0.1:7312"], labels: { conductor: cond3 } }]
+
+  # op-batcher (follows current sequencing leader)
+  - job_name: op-batcher
+    static_configs: [{ targets: ["127.0.0.1:7320"] }]
+
+  # CGT chain (420902) — single-node devnet profile; metrics flags are wired
+  # in start-cgt-stack.ps1 (node 7305, batcher 7321).
+  - job_name: op-node-cgt
+    static_configs: [{ targets: ["127.0.0.1:7305"], labels: { chain: "420902" } }]
+  - job_name: op-batcher-cgt
+    static_configs: [{ targets: ["127.0.0.1:7321"], labels: { chain: "420902" } }]
+
+  # op-challenger dispute agents (one per chain; started by
+  # start-challenger.sh inside WSL — metrics bind 0.0.0.0 and forward to
+  # localhost via WSL localhostForwarding).
+  - job_name: op-challenger-420901
+    static_configs: [{ targets: ["127.0.0.1:7360"], labels: { chain: "420901" } }]
+  - job_name: op-challenger-420902
+    static_configs: [{ targets: ["127.0.0.1:7361"], labels: { chain: "420902" } }]
+
+  # monitor.py exporter — vault balances, txpool backlog, EL replica fork
+  # detection, dispute-game counts (omnicor_* metric family)
+  - job_name: omnicor-monitor
+    static_configs: [{ targets: ["127.0.0.1:9717"] }]
+
+# NOTE: no alertmanager routing is configured yet — alerts evaluate and are
+# visible in the Prometheus UI, but nothing pages anyone until an
+# `alerting:` section + receiver are added.

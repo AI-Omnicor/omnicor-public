@@ -1,0 +1,166 @@
+# OMNICOR alert rules — tuned for the 3-node HA topology.
+#
+# Every expression below names a metric that actually exists in source:
+#   op-node      namespace op_node_default
+#     refs_time / refs_number{layer="l2", type="l2_unsafe|l2_safe|l2_finalized|..."}
+#     p2p_peer_count, sequencer_active
+#   op-conductor namespace op_conductor
+#     up, healthchecks_count{success}, state_changes_count{leader,healthy,active}
+#   op-batcher   namespace op_batcher
+#     balance (L1 balance of the txmgr sender, in ether)
+#   op-challenger namespace op_challenger
+#     up, tracked_games, inflight_games, moves
+# A PromQL name with no matching series evaluates to EMPTY — an alert that
+# can never fire is worse than none, so keep this list honest: check new
+# names against the component's metrics.go before adding them.
+groups:
+  - name: sequencing
+    rules:
+      - alert: UnsafeHeadStalled
+        expr: time() - op_node_default_refs_time{layer="l2",type="l2_unsafe"} > 30
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "op-node {{ $labels.node }}: no new unsafe block in >30s (1s cadence)"
+          runbook: "ops-runbook.md §1-2 — check conductor leader, then sequencer health"
+
+      - alert: SafeHeadStalled
+        expr: time() - op_node_default_refs_time{layer="l2",type="l2_safe"} > 600
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "op-node {{ $labels.node }}: safe head frozen >10min"
+          runbook: "ops-runbook.md §7 — batcher stalled or L1 issues"
+
+      - alert: FinalizedHeadStalled
+        expr: time() - op_node_default_refs_time{layer="l2",type="l2_finalized"} > 3600
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "op-node {{ $labels.node }}: finalized head frozen >1h"
+
+      - alert: SequencerPeerLoss
+        expr: op_node_default_p2p_peer_count < 1
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "op-node {{ $labels.node }} lost all p2p peers"
+
+      # No gauge exposes raft leadership directly; the observable failure is
+      # that no op-node is actively sequencing.
+      - alert: NoActiveSequencer
+        expr: sum(op_node_default_sequencer_active) < 1
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "No op-node reports sequencer_active — sequencing stopped"
+          runbook: "ops-runbook.md §1 — leader election / raft repair"
+
+  - name: conductor
+    rules:
+      - alert: ConductorDown
+        expr: up{job=~"op-conductor-.*"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Conductor {{ $labels.conductor }} unreachable — raft quorum at risk"
+
+      - alert: ConductorQuorumAtRisk
+        expr: count(up{job=~"op-conductor-.*"} == 1) < 2
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Fewer than 2 of 3 raft voters reachable — one more loss halts sequencing"
+
+      - alert: ConductorHealthcheckFailing
+        expr: increase(op_conductor_healthchecks_count{success="false"}[5m]) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Conductor {{ $labels.conductor }} reporting failed health checks"
+
+  - name: pipeline
+    rules:
+      - alert: BatcherDown
+        expr: up{job=~"op-batcher.*"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "op-batcher down — L2 data not reaching L1, safe head will freeze"
+          runbook: "ops-runbook.md §7"
+
+      - alert: UnsafeSafeLagLarge
+        expr: max(op_node_default_refs_number{layer="l2",type="l2_unsafe"} - ignoring(type) op_node_default_refs_number{layer="l2",type="l2_safe"}) > 7200
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "unsafe-safe lag >7200 blocks — batching backlog"
+
+      # Correct name is `balance` under the op_batcher namespace — the
+      # gauge only exists while the batcher balance monitor runs, so the
+      # companion absent() rule catches the blind spot.
+      - alert: BatcherLowL1Balance
+        expr: op_batcher_balance < 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Batcher L1 balance below 0.5 ETH — refill soon"
+
+      - alert: BatcherBalanceMetricAbsent
+        expr: absent(op_batcher_balance)
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "op_batcher_balance not exported — balance monitoring blind"
+
+  - name: faultproofs
+    # The running dispute component is op-challenger (metrics 7360/7361).
+    # op-dispute-mon is optional extra; add its scrape job if deployed.
+    rules:
+      - alert: ChallengerDown
+        expr: up{job=~"op-challenger.*"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "op-challenger {{ $labels.chain }} unreachable — dispute games unmonitored"
+
+  - name: omnicor-exporter
+    # Metrics emitted by .devnet-tools/monitor.py (job omnicor-monitor):
+    # chain-level health the component namespaces do not cover — EL reachability,
+    # txpool backlog, L1/L2 drift, replica divergence, vault balances.
+    rules:
+      - alert: L2ExecutionDown
+        expr: omnicor_l2_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "chain {{ $labels.chain }}: L2 execution client unreachable"
+          runbook: "ops-runbook.md §3 — restart the EL; watchdog handles CGT automatically"
+
+      - alert: L1L2TimestampDrift
+        expr: abs(omnicor_l1_l2_ts_drift) > 600
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "chain {{ $labels.chain }}: L1/L2 drift {{ $value }}s > max_sequencer_drift — sequencer stalls"
+
+      - alert: TxpoolBacklog
+        expr: omnicor_txpool_queued > 50000
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "chain {{ $labels.chain }}: {{ $value }} txs queued — pool beyond configured caps"
+
+      - alert: UnsafeSafeGapOmnicor
+        expr: omnicor_unsafe_safe_gap > 7200
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "chain {{ $labels.chain }} node {{ $labels.node }}: unsafe-safe gap {{ $value }} — batcher backlog"
+
+      - alert: DisputeGamesStale
+        expr: absent(omnicor_dispute_game_count)
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "monitor.py: dispute game count not exported — topology.psd1 DGF parse broken or exporter down"

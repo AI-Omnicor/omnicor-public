@@ -1,0 +1,37 @@
+name: contracts
+
+on:
+  push:
+    branches: [main]
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  pull_request:
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: contracts
+        shell: bash
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: 1.2.3
+      - name: Fetch contract libs (pinned commits)
+        run: |
+          git clone --no-checkout https://github.com/foundry-rs/forge-std lib/forge-std
+          git -C lib/forge-std checkout 6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea
+          # OZ must be >= v4.9.0 (stable ERC20Permit — see foundry.toml)
+          git clone --no-checkout https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts
+          git -C lib/openzeppelin-contracts checkout dc44c9f1a4c3b10af99492eed84f83ed244203f6
+      - name: forge build
+        run: forge build --sizes
+      - name: forge test
+        run: forge test -vvv
