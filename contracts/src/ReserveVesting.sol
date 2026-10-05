@@ -161,23 +161,26 @@ contract ReserveVesting {
         uint256 q = periodAt(block.timestamp);
         uint256 balance = token.balanceOf(address(this));
         uint256 p = nextBurnPeriod;
+        nextBurnPeriod = q;
+        uint256 totalSend;
         for (; p < q; p++) {
             uint256 remainder = tranche(p + 1) - periodClaimed[p];
             if (remainder == 0) continue;
             uint256 send = remainder < balance ? remainder : balance;
             balance -= send;
-            burned += send;
+            totalSend += send;
             emit Burned(p, send);
-            if (send > 0) token.safeTransfer(DEAD, send);
         }
-        nextBurnPeriod = q;
         // Once every tranche has ended, sweep whatever is left — rounding
         // dust below the last tranche and any tokens sent by mistake.
         // Otherwise that remainder would be locked in the contract forever.
         if (q >= PERIODS && balance > 0) {
-            burned += balance;
+            totalSend += balance;
             emit Burned(PERIODS, balance);
-            token.safeTransfer(DEAD, balance);
+        }
+        if (totalSend > 0) {
+            burned += totalSend;
+            token.safeTransfer(DEAD, totalSend);
         }
     }
 
