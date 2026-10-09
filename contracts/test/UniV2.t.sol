@@ -30,20 +30,19 @@ contract UniV2Test is Test {
         vm.deal(trader, 100 ether);
     }
 
-    /// Prints the real init code hash of this build — paste the output into
-    /// UniswapV2Library.INIT_CODE_PAIR_HASH after ANY change to
-    /// UniswapV2Pair.sol or compiler settings.
+    /// Prints the init code hash of this build — informational only; the
+    /// value is environment-dependent (source keccaks feed the metadata
+    /// hash), which is why pairFor derives it inline instead of a constant.
     function test_InitCodeHash() public view {
         bytes32 h = keccak256(type(UniswapV2Pair).creationCode);
         console2.log("INIT_CODE_PAIR_HASH:");
         console2.logBytes32(h);
     }
 
-    /// pairFor must resolve to the address the factory actually deployed —
-    /// this is the guard that catches a stale INIT_CODE_PAIR_HASH.
+    /// pairFor must resolve to the address the factory actually deployed.
     function test_PairForMatchesFactory() public {
         address predicted = UniswapV2Library.pairFor(address(factory), address(womni), address(usdt));
-        assertEq(predicted, pair, "INIT_CODE_PAIR_HASH is stale, regenerate");
+        assertEq(predicted, pair, "pairFor must match factory.getPair");
         // Symmetric order.
         assertEq(UniswapV2Library.pairFor(address(factory), address(usdt), address(womni)), pair);
         assertEq(factory.getPair(address(womni), address(usdt)), pair);

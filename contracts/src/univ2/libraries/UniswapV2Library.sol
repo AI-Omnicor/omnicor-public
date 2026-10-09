@@ -2,22 +2,20 @@
 // Canonical Uniswap V2 library, ported to Solidity 0.8.25.
 // 0.8 changes: SafeMath removed (built-in overflow checks).
 //
-// INIT_CODE_PAIR_HASH is keccak256(type(UniswapV2Pair).creationCode) for
-// THIS build — it differs from the canonical 0x96e8ac… because the pair is
-// compiled by solc 0.8.25, not 0.5.16. Regenerate after ANY change to
-// UniswapV2Pair.sol or compiler settings:
-//     forge test --match-test test_InitCodeHash -vv   (prints the value)
-// A foundry test asserts pairFor() == factory.getPair() so a stale constant
-// fails CI instead of silently misrouting swaps.
+// The canonical upstream INIT_CODE_PAIR_HASH (0x96e8ac…) is INVALID for this
+// port — it was keccak256 of the solc-0.5.16 pair build, and the hash also
+// differs across build environments (metadata hash embeds per-source
+// keccaks, so CRLF/LF and toolchain differences produce different bytecode).
+// pairFor therefore derives the hash from type(UniswapV2Pair).creationCode
+// inline — it can never go stale against the factory's embedded bytecode.
+// Cost: one keccak over ~9 KB of init code per call (~1.7k gas) — acceptable
+// for quote helpers; onchain swap paths do not route through pairFor.
 pragma solidity >=0.8.0;
 
 import "../interfaces/IUniswapV2Pair.sol";
+import "../UniswapV2Pair.sol";
 
 library UniswapV2Library {
-    // keccak256(type(UniswapV2Pair).creationCode) — see header comment.
-    // Computed from this build (solc 0.8.25, optimizer 1000 runs).
-    bytes32 internal constant INIT_CODE_PAIR_HASH =
-        0x1b3e550a5ef6896f35b0c635708031fc875929b1bb2ef4117191a9e8cf6ac079;
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
@@ -33,7 +31,7 @@ library UniswapV2Library {
                 hex"ff",
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                INIT_CODE_PAIR_HASH
+                keccak256(type(UniswapV2Pair).creationCode)
             )))));
     }
 

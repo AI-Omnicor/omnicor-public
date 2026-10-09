@@ -341,10 +341,13 @@ Pair addresses are CREATE2-derived (factory + sorted tokens +
 `keccak256(UniswapV2Pair.creationCode)` = `0x1b3e550a5ef6896f35b0c6357080
 31fc875929b1bb2ef4117191a9e8cf6ac079` for this solc-0.8.25 build) — the
 canonical upstream constant `0x96e8ac…` is invalid for this port and is
-NOT used; `UniswapV2Library.INIT_CODE_PAIR_HASH` carries the local hash
-and `UniV2.t.sol::test_PairForMatchesFactory` asserts it equals
-`factory.getPair()` so a stale constant fails the suite instead of
-silently misrouting swaps.
+NOT used. `UniswapV2Library.pairFor` derives the init-code hash inline
+via `type(UniswapV2Pair).creationCode` — a hardcoded constant proved
+fragile because the metadata hash differs across build environments
+(CRLF vs LF, toolchain variants), which broke CI; the inline derivation
+cannot go stale against the factory's embedded bytecode.
+`UniV2.t.sol::test_PairForMatchesFactory` asserts pairFor equals
+`factory.getPair()` on every platform.
 
 The previous rehearsal set (SimplePair at nonce 13, 2026-10-02 via
 `cgt_redeploy_v2.py`, pairs `0x85C5…E248`/`0xfbAb…72dd`, no router, no
