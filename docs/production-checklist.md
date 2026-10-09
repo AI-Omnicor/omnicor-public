@@ -46,8 +46,13 @@ past a failed gate.
       roles + vaults + liquidity owner → Safe / ops keys.
       Remaining blocker by design: `opcmAddress` until Phase-2 OPCM
       bootstrap; preflight fails closed on exactly that.
-- [ ] Confirm fault-proof parameters in the intent are **permissionless**
-      game type (not respectedGameType=5 permissioned)
+- [x] Fault-proof parameters in the intent are **permissionless** —
+      `respectedGameType = 8` (CANNON_KONA) set in deployOverrides
+- [ ] Build the kona-client fault-proof program reproducibly and pin the
+      resulting prestate hash — type 8 has `RequiresPrestate`, so
+      `op-deployer apply` fails without `--prestate` or
+      `faultGameAbsolutePrestate` in the intent (never commit a
+      placeholder hash)
 - [ ] Run `op-deployer apply` against mainnet; capture the L1 contract
       artifacts (state JSON)
 - [ ] Record from artifacts: `L1CrossDomainMessengerProxy` address
@@ -113,10 +118,10 @@ past a failed gate.
 
 ## Phase 6 — production hardening (before public traffic)
 
-- [ ] Replace MockQuote/SimplePair with canonical AMM components —
-      they are rehearsal stubs by design
-- [ ] Permissionless fault proofs live and verified (prestate hashes
-      pinned, challenger bonded)
+- [x] Canonical Uniswap V2 AMM deployed (Factory+Pair+Router,
+      CREATE2 pairs) — replaces MockQuote/SimplePair rehearsal stubs
+- [x] Permissionless fault proofs configured — `respectedGameType=8`
+      (CANNON_KONA) in intent; verify live + challenger bonded at deploy
 - [ ] External security audit of `omnicor/contracts` + bridge wiring +
       any OP Stack modifications — findings resolved
 - [ ] HA: second op-node + EL replica, conductor failover test,

@@ -96,22 +96,24 @@ groups:
         annotations:
           summary: "unsafe-safe lag >7200 blocks — batching backlog"
 
-      # Correct name is `balance` under the op_batcher namespace — the
-      # gauge only exists while the batcher balance monitor runs, so the
-      # companion absent() rule catches the blind spot.
+      # op-batcher's registry namespace is "op_batcher_default"
+      # (Namespace + "_" + procName in metrics.go), so the exported
+      # gauge is op_batcher_default_balance — the bare op_batcher_balance
+      # name never matches a series. The companion absent() rule catches
+      # the blind spot while the balance monitor is down.
       - alert: BatcherLowL1Balance
-        expr: op_batcher_balance < 0.5
+        expr: op_batcher_default_balance < 0.5
         for: 5m
         labels: { severity: warning }
         annotations:
           summary: "Batcher L1 balance below 0.5 ETH — refill soon"
 
       - alert: BatcherBalanceMetricAbsent
-        expr: absent(op_batcher_balance)
+        expr: absent(op_batcher_default_balance)
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: "op_batcher_balance not exported — balance monitoring blind"
+          summary: "op_batcher_default_balance not exported — balance monitoring blind"
 
   - name: faultproofs
     # The running dispute component is op-challenger (metrics 7360/7361).

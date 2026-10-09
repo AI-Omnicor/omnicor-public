@@ -14,6 +14,7 @@ procedures that were actually used to restore the chain.
 | op-conductor 1/2/3 | rpc :7545/:7645/:7845, raft :50050/50051/50053 | HA sequencer cluster |
 | rollup-boost A/B/C | engine :9751/:9752/:9753, fb WS :1112/:1115/:1116 | builder proxy |
 | op-rbuilder A/B/C | http :2222/:2223/:2224, engine :9551/:9552/:9553 | external builders |
+| fbemit A/B/C/CGT | fb WS :1112/:1115/:1116/:1118 (WSL) | flashblocks emitter (no-docker path) |
 | preconf gateway | http+ws :8547 | leader-aware preconfirmations |
 | CGT chain 420902 | EL :8845, node :9847 | OMNI gas chain (self-sequenced, no conductor) |
 
@@ -118,6 +119,41 @@ endpoint and selects the mode itself; the Windows tcprelay keeps accepting
 9751 even with a dead backend, so never probe the relay port). Nodes then
 use raw EL authrpc, conductors skip the flashblocks ws feed, Raft HA keeps
 working; only fb fan-out is lost.
+
+### 5a. Flashblocks without docker: fbemit (native path)
+`.devnet-tools/fbemit` is a ~400-line Go emitter that stands in for
+op-rbuilder/rollup-boost on this rig: it polls the EL's `pending` block every
+150 ms (`eth_getBlockByNumber("pending", true)`, single snapshot — two-call
+hashes+full fetches race the seal boundary and silently drop txs), re-encodes
+txs via the op-geth fork (deposit type 0x7e included), synthesizes receipts
+from `debug_traceBlockByNumber` callTracer (best-effort — follower ELs cannot
+trace an unexecuted pending block, so status-only receipts are emitted rather
+than dropping the frame), and streams spec-compatible `OpFlashblockPayload`
+frames on `/ws`.
+Launch order matters: emitters before conductors (`start-stack.ps1 -Phase
+boost` runs before `conductors` in `all`; conductors fail hard after 5 dial
+attempts otherwise). Only the raft LEADER fans frames out to clients — a
+follower's :840x port accepts the WS but stays silent; the preconf gateway
+follows the leader automatically.
+Observed devnet numbers: send RTT ~10-90 ms, flashblock lands ~1.5 s after
+send, canonical receipt ~10-15 ms after that. The fb lead is small because
+op-reth's pending view materializes the in-flight payload close to the seal
+boundary — real Base-style 200 ms preconfs need the actual builder pipeline.
+What the stream DOES give: inclusion is signalled at parent-seal + ~0.5 s,
+~1 s before the block commits, plus live receipts for every tx in the diff.
+Recovery after full outage: a stale unsafe head trips
+`healthcheck.unsafe-interval` → leader refuses to sequence forever. Kick it
+with `admin_startSequencer <unsafe head hash>` on the leader's node RPC
+(conductor then takes over). After a raft wipe the cluster is bootstrap-only;
+peers must be re-added via `conductor_addServerAsVoter` — the launchers do
+this automatically now (phase conductors / linux start-stack.sh).
+
+### 5b. Anvil interval mining does not drain the txpool
+`anvil --block-time 6` produces empty interval blocks while batcher/proposer
+blob txs pile up in `pending` — safe/finalized freeze (observed ~20 h stall).
+`.devnet-tools/l1_mine_watchdog.py` polls `txpool_status` and calls
+`anvil_mine` whenever pending > 0; keep it running on this rig. On Linux use
+a real L1 client or anvil without interval mining.
 
 ### 6. WSL memory livelock (WSAENOBUFS, VM unresponsive)
 4× op-reth + docker on a 7.7 GB host. Mitigations now in place:

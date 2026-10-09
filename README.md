@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/AI-Omnicor/omnicor-public/actions/workflows/contracts.yml"><img alt="CI" src="https://github.com/AI-Omnicor/omnicor-public/actions/workflows/contracts.yml/badge.svg"></a>
   <img alt="Stack" src="https://img.shields.io/badge/OP%20Stack-CGT%20v2-7C3AED">
-  <img alt="Tests" src="https://img.shields.io/badge/forge%20tests-73%20passing-22C55E">
+  <img alt="Tests" src="https://img.shields.io/badge/forge%20tests-87%20passing-22C55E">
   <img alt="Solidity" src="https://img.shields.io/badge/Solidity-0.8.25-363636">
   <img alt="Tokenomics" src="https://img.shields.io/badge/emission-decaying%20only-7C3AED">
   <img alt="Status" src="https://img.shields.io/badge/status-pre--launch-F59E0B">
@@ -58,10 +58,10 @@
 | `FeeSplitter` | L2 | 70% burn / 30% treasury — hardcoded |
 | `OMNIBurner` | L2 | Native burn sink → `0x…dEaD` |
 | `OMNICORTreasury` | L2 | RU + INTL contours, Safe-owned |
-| `WOMNI` · `SimplePair` | L2 | Wrapped OMNI + AMM rehearsal |
+| `WOMNI` · `UniswapV2` (Factory/Pair/Router) | L2 | Wrapped OMNI + canonical AMM |
 
 Full contract sources: [`contracts/src/`](contracts/src/) —
-73 Forge tests in [`contracts/test/`](contracts/test/).
+87 Forge tests in [`contracts/test/`](contracts/test/).
 
 ## Documentation
 
@@ -79,7 +79,7 @@ Full contract sources: [`contracts/src/`](contracts/src/) —
 ## Engineering
 
 ```bash
-cd contracts && forge test     # 73 tests — vesting, bridge, AMM, splitter, treasury
+cd contracts && forge test     # 87 tests — vesting, bridge, UniV2 AMM, splitter, treasury
 ```
 
 Built on the [OP Stack](https://github.com/ethereum-optimism/optimism) — custom gas token

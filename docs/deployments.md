@@ -318,23 +318,44 @@ canonical sibling-node port split `../anvil/scripts/start-stack.ps1`):**
 gasPayingToken = ("OMNICOR","OMNI").
 
 **App-layer contracts (`omnicor/contracts/`, deployed by L2 dev wallet
-`0x7099…79c8` at base nonce 13, 2026-10-02 — via
-`.devnet-tools/cgt_redeploy_v2.py`):**
+`0x7099…79c8` at base nonce 41, 2026-10-08 — via
+`.devnet-tools/cgt_redeploy_v3.py`). AMM is now the canonical Uniswap V2
+port (`src/univ2/`): Factory+Pair+Router02, CREATE2 pairs, 0.3% fee,
+TWAP accumulators, flash-swap callback, optional 1/6 protocol fee:**
 
 | Contract | Address |
 |---|---|
-| `OMNIL2Bridge` | `0x2dE080e97B0caE9825375D31f5D0eD5751fDf16D` |
-| `WOMNI` | `0x381445710b5e73d34aF196c53A3D5cDa58EDBf7A` |
-| `MockQuote` (rRUB) | `0xe6b98F104c1BEf218F3893ADab4160Dc73Eb8367` |
-| `MockQuote` (USDT) | `0x5C7c905B505f0Cf40Ab6600d05e677F717916F6B` |
-| `OMNIBurner` | `0x0D4ff719551E23185Aeb16FFbF2ABEbB90635942` |
-| `SimplePair` WOMNI/rRUB = `OMNI_RU_PAIR` | `0x85C5Dd61585773423e378146D4bEC6f8D149E248` |
-| `SimplePair` WOMNI/USDT = `OMNI_INTL_PAIR` | `0xfbAb4aa40C202E4e80390171E82379824f7372dd` |
-| `OMNICORTreasury` | `0xAfe1b5bdEbD4ae65AF2024738bf0735fbb65d44b` |
+| `OMNIL2Bridge` | `0x7290f72B5C67052DDE8e6E179F7803c493e90d3f` |
+| `WOMNI` | `0xc63d2a04762529edB649d7a4cC3E57A0085e8544` |
+| `MockQuote` (rRUB) | `0x1a6a3e7Bb246158dF31d8f924B84D961669Ba4e5` |
+| `MockQuote` (USDT) | `0x093e8F4d8f267d2CeEc9eB889E2054710d187beD` |
+| `OMNIBurner` | `0xBa3e08b4753E68952031102518379ED2fDADcA30` |
+| `UniswapV2Factory` (feeToSetter=deployer) | `0x34ee84036C47d852901b7069aBD80171D9A489a6` |
+| `UniswapV2Router02` (factory, WOMNI) | `0xa85b028984bC54A2a3D844B070544F59dDDf89DE` |
+| `UniswapV2Pair` WOMNI/rRUB = `OMNI_RU_PAIR` | `0x2e79fb9360d8a45383939877bcf9ce9048f54439` |
+| `UniswapV2Pair` WOMNI/USDT = `OMNI_INTL_PAIR` | `0x37c0a78e8d5a0f7487ec26a45ad5c41ac01c349c` |
+| `OMNICORTreasury` | `0x23d351BA89eaAc4E328133Cb48e050064C219A1E` |
+| `FeeSplitter` | `0x35D2F51DBC8b401B11fA3FE04423E0f5cd9fEDb4` |
 
-Note: addresses are nonce-derived (deployer `0x7099…79c8`, nonces
-bridge=13, WOMNI=15, rRUB=16, USDT=17, burner=18, pairRU=19,
-pairINTL=20, treasury=21; liquidity+config at 22..30). Nonce 0 was
+Pair addresses are CREATE2-derived (factory + sorted tokens +
+`keccak256(UniswapV2Pair.creationCode)` = `0x1b3e550a5ef6896f35b0c6357080
+31fc875929b1bb2ef4117191a9e8cf6ac079` for this solc-0.8.25 build) — the
+canonical upstream constant `0x96e8ac…` is invalid for this port and is
+NOT used; `UniswapV2Library.INIT_CODE_PAIR_HASH` carries the local hash
+and `UniV2.t.sol::test_PairForMatchesFactory` asserts it equals
+`factory.getPair()` so a stale constant fails the suite instead of
+silently misrouting swaps.
+
+The previous rehearsal set (SimplePair at nonce 13, 2026-10-02 via
+`cgt_redeploy_v2.py`, pairs `0x85C5…E248`/`0xfbAb…72dd`, no router, no
+TWAP) is superseded — SimplePair.sol remains in-tree as the rehearsal
+reference but is no longer deployed or wired.
+
+Note: contracts are nonce-derived (deployer `0x7099…79c8`, base nonce
+41: bridge=b+0, WOMNI=b+2, rRUB=b+3, USDT=b+4, burner=b+5, factory=b+6,
+router=b+7, treasury=b+10, splitter=b+11; createPair calls at b+8/b+9,
+liquidity+config at b+12..b+20). Pair addresses are NOT nonce-derived —
+they are CREATE2 pairs resolved via `factory.getPair()`. Nonce 0 was
 consumed by an unrelated test tx before the app deploy, so the
 canonical nonce-0 bridge address `0x8464…318bC` is unreachable on this
 chain incarnation — the paired `OMNIL1Bridge` was redeployed to
@@ -342,13 +363,16 @@ chain incarnation — the paired `OMNIL1Bridge` was redeployed to
 the real L2 bridge. On a fully clean redeploy where the deployer nonce
 is 0 on BOTH chains, the canonical addresses reproduce — never send
 test txs from the deployer key before the app-layer deploy. Both pools
-seeded 500 WOMNI / 500 quote. The bridge is authorized via
-`LiquidityController.authorizeMinter`. Older app-layer addresses from
-previous forks (`0x8464…` bridge, `0x948B…` WOMNI, `0xC6bA…`/`0x1275…`
-pairs) are dead — ignore them. Anvil runs with `--state-interval 30` so
-hard kills lose at most ~30 s of L1 history; app-layer txs are
-submitted to the EL txpool (not mined directly) so they re-mine
-deterministically after any reorg/catch-up window.
+seeded 500 WOMNI / 500 quote via direct transfer+mint (equal-value
+seeding; router `addLiquidity` also usable). The bridge is authorized
+via `LiquidityController.authorizeMinter`. Older app-layer addresses
+from previous incarnations (`0x8464…` bridge, `0x948B…`/`0x3814…`
+WOMNI, `0xC6bA…`/`0x1275…`/`0x85C5…`/`0xfbAb…` SimplePair pools,
+`0x0D4f…` burner, `0xAfe1…` treasury) are dead — ignore them. Anvil
+runs with `--state-interval 30` so hard kills lose at most ~30 s of L1
+history; app-layer txs are submitted to the EL txpool (not mined
+directly) so they re-mine deterministically after any reorg/catch-up
+window.
 
 **Verified end-to-end**
 

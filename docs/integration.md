@@ -138,17 +138,21 @@ Policy (production, decided):
 
 ## 5. Buyback-and-burn infrastructure (taxi revenue loop)
 
-Deployed on L2 (rehearsal):
+Deployed on L2 (canonical Uniswap V2, `.devnet-tools/cgt_redeploy_v3.py`):
 
 | Contract | Address | Purpose |
 |---|---|---|
-| `WOMNI` | `0x381445710b5e73d34aF196c53A3D5cDa58EDBf7A` | WETH9-style native wrapper for ERC-20 venues |
-| `MockQuote` (rRUB) | `0xe6b98F104c1BEf218F3893ADab4160Dc73Eb8367` | rehearsal quote asset (mintable) |
-| `SimplePair` WOMNI/rRUB | `0x85C5Dd61585773423e378146D4bEC6f8D149E248` | constant-product AMM, 0.3% fee |
-| `OMNIBurner` | `0x0D4ff719551E23185Aeb16FFbF2ABEbB90635942` | dead-address burner w/ events |
-| `FeeSplitter` | *(next app-layer redeploy)* | immutable 70% burn / 30% treasury split |
+| `WOMNI` | `0xc63d2a04762529edB649d7a4cC3E57A0085e8544` | WETH9-style native wrapper for ERC-20 venues |
+| `MockQuote` (rRUB) | `0x1a6a3e7Bb246158dF31d8f924B84D961669Ba4e5` | rehearsal quote asset (mintable) |
+| `MockQuote` (USDT) | `0x093e8F4d8f267d2CeEc9eB889E2054710d187beD` | rehearsal quote asset (mintable) |
+| `UniswapV2Factory` | `0x34ee84036C47d852901b7069aBD80171D9A489a6` | CREATE2 pair factory |
+| `UniswapV2Router02` | `0xa85b028984bC54A2a3D844B070544F59dDDf89DE` | add/remove liquidity, swap paths |
+| `UniswapV2Pair` WOMNI/rRUB | `0x2e79fb9360d8a45383939877bcf9ce9048f54439` | canonical AMM, 0.3% fee, TWAP |
+| `UniswapV2Pair` WOMNI/USDT | `0x37c0a78e8d5a0f7487ec26a45ad5c41ac01c349c` | canonical AMM, 0.3% fee, TWAP |
+| `OMNIBurner` | `0xBa3e08b4753E68952031102518379ED2fDADcA30` | dead-address burner w/ events |
+| `FeeSplitter` | `0x35D2F51DBC8b401B11fA3FE04423E0f5cd9fEDb4` | immutable 70% burn / 30% treasury split |
 
-Rehearsal pool: **500 WOMNI + 500 rRUB**.
+Rehearsal pool: **500 WOMNI + 500 rRUB** (same for the USDT pair).
 Rehearsed flow: `1000 rRUB → swap → 97.27 WOMNI → unwrap → 90 OMNI →
 OMNIBurner → sweep → 0x…dEaD`. All verifiable: `Swap`, `Withdrawal` (WOMNI),
 `Burned` events; `totalBurned()` counter.
@@ -159,9 +163,10 @@ OMNIBurner → sweep → 0x…dEaD`. All verifiable: `Swap`, `Withdrawal` (WOMNI
   no L1 round-trip per cycle; L1 pool optional later (would need ERC-20
   unwrap step for burn accounting).
 - **Pair: OMNI/stablecoin.** For the Russian contour a RUB-settlement
-  stablecoin; international — USDT/USDC. `SimplePair` is the rehearsal
-  reference; production should deploy a canonical UniswapV2 fork
-  (Pair+Factory) or reuse SimplePair after audit.
+  stablecoin; international — USDT/USDC. The canonical Uniswap V2 port
+  (`src/univ2/` — Factory+Pair+Router02) is deployed on devnet and is
+  the production AMM; `SimplePair` remains in-tree as historical
+  rehearsal reference only and is not wired anywhere.
 - **Seed liquidity**: from the 10% pool bucket —
   recommendation `50M OMNI` + equivalent stable. Price = `quote/OMNI`;
   impact for buy of size `Δ`: `price × (1 + Δ/reserve_quote)` approx.
@@ -181,8 +186,8 @@ All plain JSON-RPC, no subgraph needed:
 | Question | Call |
 |---|---|
 | Pool reserves | `eth_call pair.getReserves()` |
-| Spot price quote/OMNI | `eth_call pair.price0()` (1e18-scaled) |
-| Quote for a buy | `eth_call pair.getAmountOut(amountIn, tokenIn)` |
+| Spot price quote/OMNI | derive from `getReserves()` — `token0()` tells the WOMNI slot |
+| Quote for a buy | `eth_call router.getAmountsOut(amountIn, [tokenIn, womni])` — or local 997/1000 math on reserves |
 | Cumulative burned via Burner | `eth_call OMNIBurner.totalBurned()` |
 | Native balance at dead addr | `eth_getBalance 0x…dEaD` |
 | Vault pending fees | `eth_getBalance <vault>` |
@@ -193,7 +198,7 @@ All plain JSON-RPC, no subgraph needed:
 
 `passenger fiat → platform settlement account → stablecoin purchase on the
 settlement venue (off-chain) → stable lands in the buyback wallet →
-swap on SimplePair → WOMNI → unwrap → OMNIBurner → dead.`
+swap on UniswapV2Pair (via Router02) → WOMNI → unwrap → OMNIBurner → dead.`
 The on-chain entry point is the **quote-token transfer into the pair +
 `swap()`**; everything before that is business/legal infrastructure.
 
