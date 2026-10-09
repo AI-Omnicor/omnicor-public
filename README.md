@@ -69,6 +69,7 @@ Full contract sources: [`contracts/src/`](contracts/src/) —
 |---|---|
 | [`docs/tokenomics.md`](docs/tokenomics.md) | Full tokenomics spec — allocations, burns, quarterly cycle |
 | [`docs/audit.md`](docs/audit.md) | Five audit passes — every finding, severity, fix |
+| [`docs/benchmarks.md`](docs/benchmarks.md) | Measured devnet numbers vs Base / Arbitrum / OP Mainnet |
 | [`docs/integration.md`](docs/integration.md) | External-platform integration surface |
 | [`docs/deployments.md`](docs/deployments.md) | Rehearsal deployments and addresses |
 | [`docs/production-addresses.md`](docs/production-addresses.md) | Production treasury Safe + role registry |

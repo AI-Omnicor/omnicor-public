@@ -37,7 +37,7 @@
     <rect x="390" y="156" width="240" height="34" rx="8" fill="#22242E"/>
     <text x="510" y="177" text-anchor="middle">OMNIL2Bridge · authorized minter</text>
     <rect x="390" y="198" width="240" height="34" rx="8" fill="#22242E"/>
-    <text x="510" y="219" text-anchor="middle">WOMNI · SimplePair RU / INTL</text>
+    <text x="510" y="219" text-anchor="middle">WOMNI · UniV2 AMM RU / INTL</text>
     <rect x="390" y="240" width="240" height="34" rx="8" fill="#22242E" stroke="#7C3AED"/>
     <text x="510" y="261" text-anchor="middle">FeeSplitter → Burner / Treasury</text>
     <rect x="390" y="282" width="240" height="34" rx="8" fill="#22242E"/>
