@@ -142,15 +142,15 @@ Deployed on L2 (canonical Uniswap V2, `.devnet-tools/cgt_redeploy_v3.py`):
 
 | Contract | Address | Purpose |
 |---|---|---|
-| `WOMNI` | `0xc63d2a04762529edB649d7a4cC3E57A0085e8544` | WETH9-style native wrapper for ERC-20 venues |
-| `MockQuote` (rRUB) | `0x1a6a3e7Bb246158dF31d8f924B84D961669Ba4e5` | rehearsal quote asset (mintable) |
-| `MockQuote` (USDT) | `0x093e8F4d8f267d2CeEc9eB889E2054710d187beD` | rehearsal quote asset (mintable) |
-| `UniswapV2Factory` | `0x34ee84036C47d852901b7069aBD80171D9A489a6` | CREATE2 pair factory |
-| `UniswapV2Router02` | `0xa85b028984bC54A2a3D844B070544F59dDDf89DE` | add/remove liquidity, swap paths |
-| `UniswapV2Pair` WOMNI/rRUB | `0x2e79fb9360d8a45383939877bcf9ce9048f54439` | canonical AMM, 0.3% fee, TWAP |
-| `UniswapV2Pair` WOMNI/USDT | `0x37c0a78e8d5a0f7487ec26a45ad5c41ac01c349c` | canonical AMM, 0.3% fee, TWAP |
-| `OMNIBurner` | `0xBa3e08b4753E68952031102518379ED2fDADcA30` | dead-address burner w/ events |
-| `FeeSplitter` | `0x35D2F51DBC8b401B11fA3FE04423E0f5cd9fEDb4` | immutable 70% burn / 30% treasury split |
+| `WOMNI` | `0xB0748F8B73C53aB94b3DD1109f3427B7Bb2907F5` | WETH9-style native wrapper for ERC-20 venues |
+| `MockQuote` (rRUB) | `0x549bc7EE4B85A2Df5F74799f213483CE599F1999` | rehearsal quote asset (mintable) |
+| `MockQuote` (USDT) | `0xEe54514745B056F07040CaCF801f59031D801431` | rehearsal quote asset (mintable) |
+| `UniswapV2Factory` | `0x20F43316cf784C821a65aE874c8060f30c30c7C4` | CREATE2 pair factory; `pairInitCodeHash()` reports its own pair init-code hash |
+| `UniswapV2Router02` | `0x9B4aC8FAfC44575C6963fA22D50963379e899a49` | add/remove liquidity, swap paths |
+| `UniswapV2Pair` WOMNI/rRUB | `0x163fd723475300cddf4f82831938698bd20cded2` | canonical AMM, 0.3% fee, TWAP |
+| `UniswapV2Pair` WOMNI/USDT | `0xf4ca8eff68be45bf9954ea543d7df2308a8cdc51` | canonical AMM, 0.3% fee, TWAP |
+| `OMNIBurner` | `0x34E59e53Bd4f1A60ca8b6c21572509027571341d` | dead-address burner w/ events |
+| `FeeSplitter` | `0x2731e51aFF4615796D44B37a9d2E7970d88E331a` | immutable 70% burn / 30% treasury split |
 
 Rehearsal pool: **500 WOMNI + 500 rRUB** (same for the USDT pair).
 Rehearsed flow: `1000 rRUB → swap → 97.27 WOMNI → unwrap → 90 OMNI →

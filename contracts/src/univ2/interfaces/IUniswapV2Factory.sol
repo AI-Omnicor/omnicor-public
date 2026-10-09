@@ -9,6 +9,7 @@ interface IUniswapV2Factory {
     function feeToSetter() external view returns (address);
 
     function getPair(address tokenA, address tokenB) external view returns (address pair);
+    function pairInitCodeHash() external view returns (bytes32);
     function allPairs(uint) external view returns (address pair);
     function allPairsLength() external view returns (uint);
 

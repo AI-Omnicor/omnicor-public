@@ -14,8 +14,15 @@ contract UniswapV2Factory is IUniswapV2Factory {
     mapping(address => mapping(address => address)) public override getPair;
     address[] public override allPairs;
 
+    // keccak256 of the pair init code THIS factory deploys. The canonical
+    // upstream INIT_CODE_PAIR_HASH constant (0x96e8ac…) is invalid for any
+    // recompiled port — the metadata hash varies with build environment —
+    // so the hash lives here: it is always consistent with createPair().
+    bytes32 public immutable override pairInitCodeHash;
+
     constructor(address _feeToSetter) {
         feeToSetter = _feeToSetter;
+        pairInitCodeHash = keccak256(type(UniswapV2Pair).creationCode);
     }
 
     function allPairsLength() external view override returns (uint) {

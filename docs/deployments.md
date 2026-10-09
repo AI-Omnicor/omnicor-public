@@ -318,34 +318,39 @@ canonical sibling-node port split `../anvil/scripts/start-stack.ps1`):**
 gasPayingToken = ("OMNICOR","OMNI").
 
 **App-layer contracts (`omnicor/contracts/`, deployed by L2 dev wallet
-`0x7099…79c8` at base nonce 41, 2026-10-08 — via
-`.devnet-tools/cgt_redeploy_v3.py`). AMM is now the canonical Uniswap V2
+`0x7099…79c8` at base nonce 72, 2026-10-09 — via
+`.devnet-tools/cgt_redeploy_v3.py`). AMM is the canonical Uniswap V2
 port (`src/univ2/`): Factory+Pair+Router02, CREATE2 pairs, 0.3% fee,
-TWAP accumulators, flash-swap callback, optional 1/6 protocol fee:**
+TWAP accumulators, flash-swap callback, optional 1/6 protocol fee.
+This redeploy carries `UniswapV2Factory.pairInitCodeHash` — the pair
+init-code hash now lives on the factory (see below):**
 
 | Contract | Address |
 |---|---|
-| `OMNIL2Bridge` | `0x7290f72B5C67052DDE8e6E179F7803c493e90d3f` |
-| `WOMNI` | `0xc63d2a04762529edB649d7a4cC3E57A0085e8544` |
-| `MockQuote` (rRUB) | `0x1a6a3e7Bb246158dF31d8f924B84D961669Ba4e5` |
-| `MockQuote` (USDT) | `0x093e8F4d8f267d2CeEc9eB889E2054710d187beD` |
-| `OMNIBurner` | `0xBa3e08b4753E68952031102518379ED2fDADcA30` |
-| `UniswapV2Factory` (feeToSetter=deployer) | `0x34ee84036C47d852901b7069aBD80171D9A489a6` |
-| `UniswapV2Router02` (factory, WOMNI) | `0xa85b028984bC54A2a3D844B070544F59dDDf89DE` |
-| `UniswapV2Pair` WOMNI/rRUB = `OMNI_RU_PAIR` | `0x2e79fb9360d8a45383939877bcf9ce9048f54439` |
-| `UniswapV2Pair` WOMNI/USDT = `OMNI_INTL_PAIR` | `0x37c0a78e8d5a0f7487ec26a45ad5c41ac01c349c` |
-| `OMNICORTreasury` | `0x23d351BA89eaAc4E328133Cb48e050064C219A1E` |
-| `FeeSplitter` | `0x35D2F51DBC8b401B11fA3FE04423E0f5cd9fEDb4` |
+| `OMNIL2Bridge` | `0x87F850cbC2cFfac086F20d0d7307E12d06fA2127` |
+| `WOMNI` | `0xB0748F8B73C53aB94b3DD1109f3427B7Bb2907F5` |
+| `MockQuote` (rRUB) | `0x549bc7EE4B85A2Df5F74799f213483CE599F1999` |
+| `MockQuote` (USDT) | `0xEe54514745B056F07040CaCF801f59031D801431` |
+| `OMNIBurner` | `0x34E59e53Bd4f1A60ca8b6c21572509027571341d` |
+| `UniswapV2Factory` (feeToSetter=deployer) | `0x20F43316cf784C821a65aE874c8060f30c30c7C4` |
+| `UniswapV2Router02` (factory, WOMNI) | `0x9B4aC8FAfC44575C6963fA22D50963379e899a49` |
+| `UniswapV2Pair` WOMNI/rRUB = `OMNI_RU_PAIR` | `0x163fd723475300cddf4f82831938698bd20cded2` |
+| `UniswapV2Pair` WOMNI/USDT = `OMNI_INTL_PAIR` | `0xf4ca8eff68be45bf9954ea543d7df2308a8cdc51` |
+| `OMNICORTreasury` | `0xa4F9a0FCAce423B1AC9497705c4470A713cF839c` |
+| `FeeSplitter` | `0x2731e51aFF4615796D44B37a9d2E7970d88E331a` |
 
-Pair addresses are CREATE2-derived (factory + sorted tokens +
-`keccak256(UniswapV2Pair.creationCode)` = `0x1b3e550a5ef6896f35b0c6357080
-31fc875929b1bb2ef4117191a9e8cf6ac079` for this solc-0.8.25 build) — the
-canonical upstream constant `0x96e8ac…` is invalid for this port and is
-NOT used. `UniswapV2Library.pairFor` derives the init-code hash inline
-via `type(UniswapV2Pair).creationCode` — a hardcoded constant proved
-fragile because the metadata hash differs across build environments
-(CRLF vs LF, toolchain variants), which broke CI; the inline derivation
-cannot go stale against the factory's embedded bytecode.
+Pair addresses are CREATE2-derived (factory + sorted tokens + init-code
+hash). The factory reports its own hash via `pairInitCodeHash()` —
+`0x03bdd8fbb05ba412c3174fd991abe86cd84dedb1b6c37f926c415ff4f3f41a4b`
+for this build — and `UniswapV2Library.pairFor` reads it with a
+staticcall instead of carrying a hardcoded constant. The canonical
+upstream constant `0x96e8ac…` is invalid for any recompiled port, and a
+local constant proved fragile too: the metadata hash differs across
+build environments (observed: Linux CI produced a different
+creationCode hash than the Windows devnet build → CI failure), while
+embedding `type(UniswapV2Pair).creationCode` inline pushes Router02
+past the 24 KiB EIP-170 limit. Reading the hash from the factory makes
+pairFor correct for WHATEVER bytecode the factory deploys.
 `UniV2.t.sol::test_PairForMatchesFactory` asserts pairFor equals
 `factory.getPair()` on every platform.
 
@@ -355,7 +360,7 @@ TWAP) is superseded — SimplePair.sol remains in-tree as the rehearsal
 reference but is no longer deployed or wired.
 
 Note: contracts are nonce-derived (deployer `0x7099…79c8`, base nonce
-41: bridge=b+0, WOMNI=b+2, rRUB=b+3, USDT=b+4, burner=b+5, factory=b+6,
+72: bridge=b+0, WOMNI=b+2, rRUB=b+3, USDT=b+4, burner=b+5, factory=b+6,
 router=b+7, treasury=b+10, splitter=b+11; createPair calls at b+8/b+9,
 liquidity+config at b+12..b+20). Pair addresses are NOT nonce-derived —
 they are CREATE2 pairs resolved via `factory.getPair()`. Nonce 0 was
@@ -369,9 +374,12 @@ test txs from the deployer key before the app-layer deploy. Both pools
 seeded 500 WOMNI / 500 quote via direct transfer+mint (equal-value
 seeding; router `addLiquidity` also usable). The bridge is authorized
 via `LiquidityController.authorizeMinter`. Older app-layer addresses
-from previous incarnations (`0x8464…` bridge, `0x948B…`/`0x3814…`
-WOMNI, `0xC6bA…`/`0x1275…`/`0x85C5…`/`0xfbAb…` SimplePair pools,
-`0x0D4f…` burner, `0xAfe1…` treasury) are dead — ignore them. Anvil
+from previous incarnations (`0x8464…`/`0x7290…` bridge,
+`0x948B…`/`0x3814…`/`0xc63d…` WOMNI,
+`0xC6bA…`/`0x1275…`/`0x85C5…`/`0xfbAb…` SimplePair pools,
+`0x34ee…`/`0xa85b…` factory+router, `0x2e79…`/`0x37c0…` UniV2 pairs,
+`0x0D4f…`/`0xBa3e…` burner, `0xAfe1…`/`0x23d3…` treasury,
+`0x35D2…` splitter) are dead — ignore them. Anvil
 runs with `--state-interval 30` so hard kills lose at most ~30 s of L1
 history; app-layer txs are submitted to the EL txpool (not mined
 directly) so they re-mine deterministically after any reorg/catch-up

@@ -3,17 +3,18 @@
 // 0.8 changes: SafeMath removed (built-in overflow checks).
 //
 // The canonical upstream INIT_CODE_PAIR_HASH (0x96e8ac…) is INVALID for this
-// port — it was keccak256 of the solc-0.5.16 pair build, and the hash also
-// differs across build environments (metadata hash embeds per-source
-// keccaks, so CRLF/LF and toolchain differences produce different bytecode).
-// pairFor therefore derives the hash from type(UniswapV2Pair).creationCode
-// inline — it can never go stale against the factory's embedded bytecode.
-// Cost: one keccak over ~9 KB of init code per call (~1.7k gas) — acceptable
-// for quote helpers; onchain swap paths do not route through pairFor.
+// port — it was keccak256 of the solc-0.5.16 pair build, and a hardcoded
+// replacement is still wrong because the metadata hash differs across build
+// environments (CRLF/LF, toolchain variants — observed: Linux CI produced a
+// different hash than the Windows devnet build). Embedding
+// type(UniswapV2Pair).creationCode inline instead inflates Router02 past the
+// 24 KiB EIP-170 limit. So pairFor reads the hash from the factory itself
+// (pairInitCodeHash, set in the factory constructor) — one extra staticcall,
+// and it can never disagree with the bytecode the factory actually deploys.
 pragma solidity >=0.8.0;
 
 import "../interfaces/IUniswapV2Pair.sol";
-import "../UniswapV2Pair.sol";
+import "../interfaces/IUniswapV2Factory.sol";
 
 library UniswapV2Library {
 
@@ -24,14 +25,15 @@ library UniswapV2Library {
         require(token0 != address(0), "UniswapV2Library: ZERO_ADDRESS");
     }
 
-    // calculates the CREATE2 address for a pair without making any external calls
-    function pairFor(address factory, address tokenA, address tokenB) internal pure returns (address pair) {
+    // calculates the CREATE2 address a pair has — the init-code hash comes
+    // from the factory (view call), not a compile-time constant
+    function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
         (address token0, address token1) = sortTokens(tokenA, tokenB);
         pair = address(uint160(uint256(keccak256(abi.encodePacked(
                 hex"ff",
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                keccak256(type(UniswapV2Pair).creationCode)
+                IUniswapV2Factory(factory).pairInitCodeHash()
             )))));
     }
 
