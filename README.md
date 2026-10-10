@@ -16,6 +16,8 @@
 > Stack, with OMNI as the chain's native gas token (custom gas token, CGT v2). Application-layer
 > bridging, deflationary tokenomics enforced by immutable contracts, and a revenue-linked
 > burn tied to real platform usage — the [TAKSI mobility platform](https://github.com/AI-Omnicor/taksi-platform-public).
+>
+> **Website:** [omnicornetwork.com](https://omnicornetwork.com) — measured specs, comparison vs major L2s, docs and staging telemetry.
 
 ## What makes it different
 
